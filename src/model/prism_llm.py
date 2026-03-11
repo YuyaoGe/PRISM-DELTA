@@ -1,9 +1,12 @@
+"""PrismLLM -- inference-time steering via differential cross-covariance projections."""
 from __future__ import annotations
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, PreTrainedModel, PreTrainedTokenizer
 from src.utils import encode_with_markers, _parse_layers, _load_proj, phi, phi_inv
 
-class SEKALLM:
+class PrismLLM:
+    """Wraps a HuggingFace causal LM with PRISM projection-based steering hooks."""
+
     # ───────────── init ────────────────────────────────────────────────
     def __init__(self,
                  model_or_path: str,
@@ -19,13 +22,14 @@ class SEKALLM:
                  feature_function: str | None = None,
                  **hf_kwargs
                  ):
+        """Load the base LM and store projection/steering configuration."""
         # ----- extract custom params before passing to HF -----
-        self.wd_seka_pt = hf_kwargs.pop('wd_seka_pt', None)
-        self.wd_seka_gain = hf_kwargs.pop('wd_seka_gain', 1.0)
-        self.wd_seka_uniform_weight = hf_kwargs.pop('wd_seka_uniform_weight', False)
-        self.kv_seka_pt = hf_kwargs.pop('kv_seka_pt', None)
-        self.kv_seka_gain_k = hf_kwargs.pop('kv_seka_gain_k', 0.4)
-        self.kv_seka_gain_v = hf_kwargs.pop('kv_seka_gain_v', 0.2)
+        self.prism_k_pt = hf_kwargs.pop('prism_k_pt', None)
+        self.prism_k_gain = hf_kwargs.pop('prism_k_gain', 1.0)
+        self.prism_k_uniform_weight = hf_kwargs.pop('prism_k_uniform_weight', False)
+        self.prism_kv_pt = hf_kwargs.pop('prism_kv_pt', None)
+        self.prism_kv_gain_k = hf_kwargs.pop('prism_kv_gain_k', 0.4)
+        self.prism_kv_gain_v = hf_kwargs.pop('prism_kv_gain_v', 0.2)
 
         # ----- device selection -----
         if device == "auto":
@@ -36,7 +40,7 @@ class SEKALLM:
         multi_gpu = torch.cuda.device_count() > 1 and str(device).startswith("cuda")
 
         # ----- HF objects -----
-        self.name_or_path = f"SEKA-{model_or_path}"
+        self.name_or_path = f"PRISM-{model_or_path}"
         self.tok: PreTrainedTokenizer = AutoTokenizer.from_pretrained(model_or_path, padding_side="left", **hf_kwargs)
 
         if multi_gpu:
@@ -83,6 +87,7 @@ class SEKALLM:
                  attention_mask: torch.Tensor | None = None,
                  return_raw: bool = False,
                  **gen_kw) -> str:
+        """Generate text, applying PRISM steering hooks during forward passes."""
 
         if isinstance(ids, (str, list)):
             ids, steer_mask, attention_mask = encode_with_markers(ids, self.tok, self.m_start, self.m_end)
@@ -100,10 +105,10 @@ class SEKALLM:
             attention_mask = attention_mask.to(self.device)
 
         # -------- optional steering --------
-        if steer and self.kv_seka_pt:
-            self.attach_kv_seka(steer_mask_tensor=steer_mask, silence=True)
-        elif steer and self.wd_seka_pt:
-            self.attach_wd_seka(steer_mask_tensor=steer_mask, silence=True)
+        if steer and self.prism_kv_pt:
+            self.attach_prism_kv(steer_mask_tensor=steer_mask, silence=True)
+        elif steer and self.prism_k_pt:
+            self.attach_prism_k(steer_mask_tensor=steer_mask, silence=True)
         elif steer:
             self.attach_projection(steer_mask_tensor=steer_mask, silence=True)
         else:
@@ -142,6 +147,7 @@ class SEKALLM:
         feature_function=None,
         silence=False
     ):
+        """Attach SEKA-style (non-differential) key projection hooks."""
         self.remove_projection()
 
         # defaults
@@ -250,12 +256,12 @@ class SEKALLM:
         if not silence:
             print(f"✅ Steering hooks attached on layers {sel_layers}")
 
-    def attach_wd_seka(self, steer_mask_tensor=None, silence=False):
-        """WD-SEKA: Attach differential projection with soft head weighting."""
+    def attach_prism_k(self, steer_mask_tensor=None, silence=False):
+        """Attach PRISM-K (key-only) differential projection with per-head softplus weighting."""
         self.remove_projection()
 
-        wd_pt = self.wd_seka_pt
-        gain = self.wd_seka_gain
+        wd_pt = self.prism_k_pt
+        gain = self.prism_k_gain
         layers_spec = self.layers
         feature_function = self.feature_function
 
@@ -269,7 +275,7 @@ class SEKALLM:
 
         # Precompute soft weights: softplus(norm_diff - min_diff)
         # Falls back to uniform weights (1.0) if norm_diffs not in file or uniform_weight is set
-        if self.wd_seka_uniform_weight:
+        if self.prism_k_uniform_weight:
             soft_weights = torch.ones(P_diff_stack.shape[0], P_diff_stack.shape[1])
         elif 'norm_diffs' in obj:
             norm_diffs = obj['norm_diffs'].to(torch.float32)
@@ -336,15 +342,15 @@ class SEKALLM:
             self._hooks.append(mod.register_forward_hook(_hook))
 
         if not silence:
-            print(f"WD-SEKA hooks attached on layers {sel_layers}")
+            print(f"PRISM-K hooks attached on layers {sel_layers}")
 
-    def attach_kv_seka(self, steer_mask_tensor=None, silence=False):
-        """KV-SEKA: Attach differential projection on both Key and Value."""
+    def attach_prism_kv(self, steer_mask_tensor=None, silence=False):
+        """Attach PRISM-KV (key+value) differential projections with per-head softplus weighting."""
         self.remove_projection()
 
-        kv_pt = self.kv_seka_pt
-        gk = self.kv_seka_gain_k
-        gv = self.kv_seka_gain_v
+        kv_pt = self.prism_kv_pt
+        gk = self.prism_kv_gain_k
+        gv = self.prism_kv_gain_v
         layers_spec = self.layers
         feature_function = self.feature_function
 
@@ -443,9 +449,10 @@ class SEKALLM:
             self._hooks.append(v_mod.register_forward_hook(_v_hook))
 
         if not silence:
-            print(f"KV-SEKA hooks attached on layers {sel_layers}")
+            print(f"PRISM-KV hooks attached on layers {sel_layers}")
 
     def remove_projection(self):
+        """Remove all active steering hooks from the model."""
         for h in self._hooks:
             h.remove()
         self._hooks.clear()

@@ -1,4 +1,4 @@
-# src/model/seka_llm_adaptive.py
+"""AdaptivePrismLLM -- query-adaptive multi-expert projection steering."""
 from __future__ import annotations
 import torch
 import torch.nn as nn
@@ -212,8 +212,8 @@ class TaskSpecificProjector:
         return dynamic_proj
 
 
-class AdaptiveSEKALLM:
-    """Enhanced SEKA with query-adaptive projections using training-free approach"""
+class AdaptivePrismLLM:
+    """PRISM variant with query-adaptive routing across multiple expert projections."""
 
     def __init__(self,
                  model_or_path: str,
@@ -230,6 +230,7 @@ class AdaptiveSEKALLM:
                  temperature: float = 1.0,
                  **hf_kwargs
                  ):
+        """Load the base LM and initialize multi-expert SVD projector."""
         if device == "auto":
             device = ("cuda" if torch.cuda.is_available()
                       else "mps" if torch.backends.mps.is_available()
@@ -237,11 +238,11 @@ class AdaptiveSEKALLM:
 
         multi_gpu = torch.cuda.device_count() > 1 and str(device).startswith("cuda")
 
-        self.name_or_path = f"AdaptiveSEKA-{model_or_path}"
+        self.name_or_path = f"AdaptivePRISM-{model_or_path}"
         self.tok: PreTrainedTokenizer = AutoTokenizer.from_pretrained(model_or_path, padding_side="left", **hf_kwargs)
 
         if multi_gpu:
-            print(f"Initializing AdaptiveSEKA with {torch.cuda.device_count()} GPUs")
+            print(f"Initializing AdaptivePRISM with {torch.cuda.device_count()} GPUs")
             self.model: PreTrainedModel = AutoModelForCausalLM.from_pretrained(
                 model_or_path, device_map="auto", **hf_kwargs).eval()
             self.multi_gpu = True
@@ -263,7 +264,7 @@ class AdaptiveSEKALLM:
         self.temperature = temperature
 
         if expert_paths is None:
-            raise ValueError("expert_paths must be provided for adaptive SEKA")
+            raise ValueError("expert_paths must be provided for AdaptivePrismLLM")
 
         # Get model's dtype for expert matrix compatibility
         self.model_dtype = next(self.model.parameters()).dtype
@@ -347,6 +348,7 @@ class AdaptiveSEKALLM:
                  attention_mask: torch.Tensor | None = None,
                  return_raw: bool = False,
                  **gen_kw) -> str:
+        """Generate text with query-adaptive multi-expert steering."""
 
         if isinstance(ids, (str, list)):
             ids, steer_mask, attention_mask = encode_with_markers(ids, self.tok, self.m_start, self.m_end)
@@ -424,6 +426,7 @@ class AdaptiveSEKALLM:
                                    steer_mask_tensor=None,
                                    amplify_factor=None,
                                    silence=False):
+        """Compute per-layer dynamic projections and register forward hooks."""
         self.remove_projection()
         amplify_factor = self.amplify_factor if amplify_factor is None else amplify_factor
         
@@ -530,13 +533,25 @@ class AdaptiveSEKALLM:
                 print(f"✅ Adaptive steering hooks attached on layers {self.sel_layers}")
 
     def remove_projection(self):
+        """Remove all active steering hooks."""
         for h in self._hooks: h.remove()
         self._hooks.clear()
 
-    def set_amplify_factor(self, factor: float): self.amplify_factor = factor
-    def set_combination_method(self, method: str): self.combination_method = method
-    def set_top_k_singular(self, k: int): self.top_k_singular = k
-    def set_temperature(self, temp: float): self.temperature = temp
+    def set_amplify_factor(self, factor: float):
+        """Update the global gain multiplier."""
+        self.amplify_factor = factor
+
+    def set_combination_method(self, method: str):
+        """Switch expert combination strategy."""
+        self.combination_method = method
+
+    def set_top_k_singular(self, k: int):
+        """Set number of top singular vectors used in routing."""
+        self.top_k_singular = k
+
+    def set_temperature(self, temp: float):
+        """Set temperature for softmax over expert coefficients."""
+        self.temperature = temp
     
     def debug_coefficient_statistics(self, input_ids: torch.Tensor, steer_mask_tensor: torch.Tensor):
         """Print coefficient statistics for debugging routing behavior."""

@@ -1,4 +1,4 @@
-# src/model/projection_builder_base.py
+"""Base class for building PRISM differential projections from contrastive data."""
 from __future__ import annotations
 import abc, argparse, json, pathlib, torch
 import os
@@ -18,6 +18,8 @@ torch.set_grad_enabled(False)
 
 
 class ProjectionBuilderBase(abc.ABC):
+    """Abstract base for building contrastive cross-covariance projections."""
+
     def __init__(
             self,
             model_path: str,
@@ -31,8 +33,8 @@ class ProjectionBuilderBase(abc.ABC):
             device: str = 'cuda' if torch.cuda.is_available() else 'cpu',
             save_svd: bool = False,  # NEW: whether to save SVD components
             save_traditional: bool = True,  # NEW: whether to save traditional projections
-            save_differential: bool = False,  # WD-SEKA: whether to save differential projections
-            save_kv_differential: bool = False,  # KV-SEKA: whether to save KV differential projections
+            save_differential: bool = False,  # PRISM-K: whether to save differential projections
+            save_kv_differential: bool = False,  # PRISM-KV: whether to save KV differential projections
     ):
         self.data_path = data_path
         self.model_path = model_path
@@ -357,7 +359,7 @@ class ProjectionBuilderBase(abc.ABC):
         print(f"Saved negative projectors to {output_dir}, {tuple(neg_proj.shape)}")
 
     def _compute_and_save_differential(self, buf_H, buf_Hp, buf_Hn, num_layers, n_kv, output_dir):
-        """WD-SEKA: Compute differential cross-covariance projection and norm_diff weights."""
+        """PRISM-K: Compute differential cross-covariance projection and norm_diff weights."""
         proj_list = []
         norm_diff_list = []
         applied, skipped = [], []
@@ -430,7 +432,7 @@ class ProjectionBuilderBase(abc.ABC):
             print(f"   SVD files: {svd_path}")
             del self._diff_svd_buf
 
-        print(f"\nDifferential Projection Summary (WD-SEKA):")
+        print(f"\nDifferential Projection Summary (PRISM-K):")
         if applied:
             print(f" Applied: {len(applied)}")
         if skipped:
@@ -440,7 +442,7 @@ class ProjectionBuilderBase(abc.ABC):
     def _compute_and_save_kv_differential(self, buf_H_k, buf_Hp_k, buf_Hn_k,
                                            buf_H_v, buf_Hp_v, buf_Hn_v,
                                            num_layers, n_kv, output_dir):
-        """KV-SEKA: Compute differential projections for both Key and Value."""
+        """PRISM-KV: Compute differential projections for both Key and Value."""
         k_proj_list, v_proj_list = [], []
         k_nd_list, v_nd_list = [], []
         k_applied, v_applied, skipped_k, skipped_v = [], [], [], []
@@ -503,7 +505,7 @@ class ProjectionBuilderBase(abc.ABC):
             'min_diff': self.min_diff,
         }, proj_path)
 
-        print(f"\nKV Differential Projection Summary (KV-SEKA):")
+        print(f"\nKV Differential Projection Summary (PRISM-KV):")
         print(f" Key: applied={len(k_applied)}, skipped={len(skipped_k)}")
         print(f" Val: applied={len(v_applied)}, skipped={len(skipped_v)}")
         print(f" Avg Key norm_diff: {k_nds.mean():.4f}, Avg Val norm_diff: {v_nds.mean():.4f}")

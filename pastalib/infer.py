@@ -1,9 +1,10 @@
+"""Standalone PASTA inference demo."""
 import os
 from pastalib.pasta import PASTA, read_head_config
 from transformers import AutoModelForCausalLM,AutoTokenizer
 
 # Initialize pre-trained LLM
-name = os.environ.get("SEKA_MODEL_PATH", "pretrained/Qwen3-8B-Base")  # set SEKA_MODEL_PATH or edit this path
+name = os.environ.get("PRISM_MODEL_PATH", os.environ.get("SEKA_MODEL_PATH", "pretrained/Qwen3-8B-Base"))  # set PRISM_MODEL_PATH or edit this path
 model = AutoModelForCausalLM.from_pretrained(
     name,
     torch_dtype="auto",
