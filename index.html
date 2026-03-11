@@ -118,58 +118,6 @@
     </div>
   </section>
 
-  <!-- ═══════════ QUICK START ═══════════ -->
-  <section id="quickstart">
-    <div class="container">
-      <h2 class="section-title fade-in">Quick Start</h2>
-      <div class="terminal fade-in">
-        <div class="terminal-bar">
-          <span class="terminal-dot red"></span>
-          <span class="terminal-dot yellow"></span>
-          <span class="terminal-dot green"></span>
-          <span class="terminal-title">terminal</span>
-        </div>
-        <pre class="terminal-body"><code><span class="prompt">$</span> pip install -r requirements.txt
-
-<span class="comment"># Build PRISM-K projection</span>
-<span class="prompt">$</span> python src/custom_builders/synthetic_qa_builder.py \
-    --model Qwen/Qwen3-4B-Base \
-    --data data/synthetic/pair_qa_new.jsonl \
-    --output_dir ./projections --diff-only
-
-<span class="comment"># Run evaluation with PRISM-K steering</span>
-<span class="prompt">$</span> python benchmarks/eval_bias_gen.py \
-    --model Qwen/Qwen3-4B-Base \
-    --data_path data/biasbios/biasbios.json \
-    --output_dir ./results/prism-k \
-    --prism-k --prism-k-proj ./projections/*_diff_proj.pt \
-    --prism-k-gain 0.40 --layers all</code></pre>
-      </div>
-    </div>
-  </section>
-
-  <!-- ═══════════ CITATION ═══════════ -->
-  <section id="citation">
-    <div class="container">
-      <h2 class="section-title fade-in">Citation</h2>
-      <div class="citation-block fade-in">
-        <button class="copy-btn" onclick="copyBibtex()" title="Copy to clipboard">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-        </button>
-        <pre id="bibtex"><code>@inproceedings{
-  li2026spectral,
-  title={Spectral Attention Steering for Prompt Highlighting},
-  author={Weixian Waylon Li and Yuchen Niu and Yongxin Yang
-          and Keshuang Li and Tiejun Ma and Shay B Cohen},
-  booktitle={The Fourteenth International Conference
-             on Learning Representations},
-  year={2026},
-  url={https://openreview.net/forum?id=XfLvGIFmAN}
-}</code></pre>
-      </div>
-    </div>
-  </section>
-
   <!-- ═══════════ FOOTER ═══════════ -->
   <footer>
     <div class="container">
