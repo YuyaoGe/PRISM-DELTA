@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PRISM-Delta: Projection-based Relevance-Informed Steering Method</title>
+  <meta name="description" content="PRISM-Delta steers both Key and Value channels of Transformer attention via differential cross-covariance decomposition. Training-free, FlashAttention compatible.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ═══════════ HERO ═══════════ -->
+  <section id="hero">
+    <canvas id="particle-canvas"></canvas>
+    <div class="hero-content">
+      <h1 class="hero-title">PRISM<span class="delta">-&Delta;</span></h1>
+      <p class="hero-tagline">Projection-based Relevance-Informed Steering Method</p>
+      <p class="hero-sub">Training-free attention steering via differential cross-covariance decomposition.<br>Compatible with FlashAttention. Negligible memory overhead.</p>
+      <div class="hero-badges">
+        <a href="https://arxiv.org/abs/2603.01281" class="badge" target="_blank" rel="noopener">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M4 2h10l6 6v14H4V2zm9 1v6h6"/></svg>
+          arXiv
+        </a>
+        <a href="https://github.com/YuyaoGe/PRISM-DELTA" class="badge" target="_blank" rel="noopener">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.5-1.4-1.3-1.8-1.3-1.8-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.7-1.6-2.7-.3-5.5-1.3-5.5-6 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.4 1.2a11.5 11.5 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.7 1.7.3 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.7-2.8 5.7-5.5 6 .4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .3"/></svg>
+          Code
+        </a>
+        <a href="https://huggingface.co/datasets/waylonli/SEKA-datasets" class="badge" target="_blank" rel="noopener">
+          &#x1F917; Dataset
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════ METHOD ═══════════ -->
+  <section id="method">
+    <div class="container">
+      <h2 class="section-title fade-in">How It Works</h2>
+      <div class="method-grid">
+        <div class="method-card fade-in">
+          <div class="card-icon">
+            <svg width="48" height="48" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="24" cy="24" r="20"/>
+              <line x1="14" y1="24" x2="34" y2="24"/>
+              <line x1="24" y1="14" x2="24" y2="34"/>
+              <line x1="17" y1="17" x2="31" y2="31" stroke-dasharray="3 2"/>
+              <line x1="31" y1="17" x2="17" y2="31" stroke-dasharray="3 2"/>
+            </svg>
+          </div>
+          <h3>Differential Cross-Covariance</h3>
+          <p>SVD of &Omega;<sub>&Delta;</sub> = &Omega;<sup>+</sup> &minus; &Omega;<sup>&minus;</sup> extracts directions that distinguish relevant from irrelevant conditions, automatically eliminating shared variance.</p>
+        </div>
+        <div class="method-card fade-in">
+          <div class="card-icon">
+            <svg width="48" height="48" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="8" y="30" width="6" height="10" rx="1"/>
+              <rect x="17" y="22" width="6" height="18" rx="1"/>
+              <rect x="26" y="14" width="6" height="26" rx="1"/>
+              <rect x="35" y="8" width="6" height="32" rx="1"/>
+              <path d="M8 28 Q20 10 41 8" stroke-dasharray="4 2"/>
+            </svg>
+          </div>
+          <h3>Softplus Head Weighting</h3>
+          <p>Each attention head receives a continuous importance weight based on its discriminability score, replacing binary hard thresholds with smooth gradation.</p>
+        </div>
+        <div class="method-card fade-in">
+          <div class="card-icon">
+            <svg width="48" height="48" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 16 L24 8 L36 16"/>
+              <path d="M12 32 L24 40 L36 32"/>
+              <line x1="12" y1="16" x2="12" y2="32"/>
+              <line x1="36" y1="16" x2="36" y2="32"/>
+              <line x1="24" y1="8" x2="24" y2="40" stroke-dasharray="4 2"/>
+              <text x="16" y="23" font-size="7" fill="currentColor" stroke="none">K</text>
+              <text x="28" y="23" font-size="7" fill="currentColor" stroke="none">V</text>
+            </svg>
+          </div>
+          <h3>Dual-Channel Steering</h3>
+          <p>Optionally steers both Key (routing) and Value (content) channels simultaneously, enabling fine-grained control over information flow.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════ OVERVIEW FIGURE ═══════════ -->
+  <section id="figure">
+    <div class="container">
+      <div class="figure-wrapper fade-in">
+        <img src="assets/overview.png" alt="PRISM-Delta method overview" loading="lazy">
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════ RESULTS ═══════════ -->
+  <section id="results">
+    <div class="container">
+      <h2 class="section-title fade-in">Key Results</h2>
+      <div class="results-grid">
+        <div class="result-card fade-in">
+          <div class="result-number">5</div>
+          <div class="result-label">Models Supported</div>
+          <div class="result-detail">Qwen3 (4B/8B/14B) &middot; Gemma3 (4B/12B)</div>
+        </div>
+        <div class="result-card fade-in">
+          <div class="result-number">3</div>
+          <div class="result-label">Benchmarks</div>
+          <div class="result-detail">BiasBios &middot; CounterFact &middot; PronChange</div>
+        </div>
+        <div class="result-card fade-in">
+          <div class="result-number">0</div>
+          <div class="result-label">Training Required</div>
+          <div class="result-detail">Pure inference-time &middot; FlashAttention compatible</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════ QUICK START ═══════════ -->
+  <section id="quickstart">
+    <div class="container">
+      <h2 class="section-title fade-in">Quick Start</h2>
+      <div class="terminal fade-in">
+        <div class="terminal-bar">
+          <span class="terminal-dot red"></span>
+          <span class="terminal-dot yellow"></span>
+          <span class="terminal-dot green"></span>
+          <span class="terminal-title">terminal</span>
+        </div>
+        <pre class="terminal-body"><code><span class="prompt">$</span> pip install -r requirements.txt
+
+<span class="comment"># Build PRISM-K projection</span>
+<span class="prompt">$</span> python src/custom_builders/synthetic_qa_builder.py \
+    --model Qwen/Qwen3-4B-Base \
+    --data data/synthetic/pair_qa_new.jsonl \
+    --output_dir ./projections --diff-only
+
+<span class="comment"># Run evaluation with PRISM-K steering</span>
+<span class="prompt">$</span> python benchmarks/eval_bias_gen.py \
+    --model Qwen/Qwen3-4B-Base \
+    --data_path data/biasbios/biasbios.json \
+    --output_dir ./results/prism-k \
+    --prism-k --prism-k-proj ./projections/*_diff_proj.pt \
+    --prism-k-gain 0.40 --layers all</code></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════ CITATION ═══════════ -->
+  <section id="citation">
+    <div class="container">
+      <h2 class="section-title fade-in">Citation</h2>
+      <div class="citation-block fade-in">
+        <button class="copy-btn" onclick="copyBibtex()" title="Copy to clipboard">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        </button>
+        <pre id="bibtex"><code>@inproceedings{
+  li2026spectral,
+  title={Spectral Attention Steering for Prompt Highlighting},
+  author={Weixian Waylon Li and Yuchen Niu and Yongxin Yang
+          and Keshuang Li and Tiejun Ma and Shay B Cohen},
+  booktitle={The Fourteenth International Conference
+             on Learning Representations},
+  year={2026},
+  url={https://openreview.net/forum?id=XfLvGIFmAN}
+}</code></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════ FOOTER ═══════════ -->
+  <footer>
+    <div class="container">
+      <div class="footer-links">
+        <a href="https://arxiv.org/abs/2603.01281" target="_blank" rel="noopener">Paper</a>
+        <a href="https://github.com/YuyaoGe/PRISM-DELTA" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://huggingface.co/datasets/waylonli/SEKA-datasets" target="_blank" rel="noopener">Dataset</a>
+      </div>
+      <p class="footer-ack">Built upon <a href="https://github.com/waylonli/SEKA" target="_blank" rel="noopener">SEKA</a>, <a href="https://github.com/yfqiu-nlp/sea-llm" target="_blank" rel="noopener">SEA-LLM</a>, <a href="https://github.com/QingruZhang/PASTA" target="_blank" rel="noopener">PASTA</a>, and <a href="https://github.com/magic-YuanTian/Selective-Prompt-Anchoring" target="_blank" rel="noopener">SPA</a>.</p>
+    </div>
+  </footer>
+
+  <script src="main.js"></script>
+</body>
+</html>
