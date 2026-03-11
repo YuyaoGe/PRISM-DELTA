@@ -1,3 +1,4 @@
+"""CounterFact generation benchmark with PRISM steering support."""
 import os
 import json
 import logging
@@ -6,13 +7,13 @@ import datasets
 import transformers
 from pathlib import Path
 
-from src.model import SEKALLM, AdaptiveSEKALLM
+from src.model import PrismLLM, AdaptivePrismLLM
 from pastalib.pasta import PASTA, read_head_config
 
 from benchmarks.counterfact.preprocess import load_dataset
 from benchmarks.counterfact.evaluate import (
-    counterfact_efficacy, 
-    counterfact_paraphrase, 
+    counterfact_efficacy,
+    counterfact_paraphrase,
     counterfact_generation,
     load_attribute_snippets,
     load_counterfact_tfidf_vectorizer
@@ -25,44 +26,44 @@ def main(args: argparse.Namespace):
     """Run the CounterFact benchmark."""
     datasets.disable_caching()
     logger.info(args)
-    
+
     # Initialize the model and tokenizer
     pasta = None
-    if args.kv_seka:
-        model = SEKALLM(
+    if args.prism_kv:
+        model = PrismLLM(
             args.model,
-            pos_pt=args.kv_seka_proj,
+            pos_pt=args.prism_kv_proj,
             marker_start=args.marker_start,
             marker_end=args.marker_end,
             layers=args.layers,
             torch_dtype="auto",
             device="auto",
             attn_implementation="sdpa",
-            kv_seka_pt=args.kv_seka_proj,
-            kv_seka_gain_k=args.kv_seka_gain_k,
-            kv_seka_gain_v=args.kv_seka_gain_v,
+            prism_kv_pt=args.prism_kv_proj,
+            prism_kv_gain_k=args.prism_kv_gain_k,
+            prism_kv_gain_v=args.prism_kv_gain_v,
         )
         tokenizer = model.tok
         if not args.add_marker:
-            logger.warning("KV-SEKA requires markers, setting add_marker to True.")
+            logger.warning("PRISM-KV requires markers, setting add_marker to True.")
             args.add_marker = True
-    elif args.wd_seka:
-        model = SEKALLM(
+    elif args.prism_k:
+        model = PrismLLM(
             args.model,
-            pos_pt=args.wd_seka_proj,
+            pos_pt=args.prism_k_proj,
             marker_start=args.marker_start,
             marker_end=args.marker_end,
             layers=args.layers,
             torch_dtype="auto",
             device="auto",
             attn_implementation="sdpa",
-            wd_seka_pt=args.wd_seka_proj,
-            wd_seka_gain=args.wd_seka_gain,
-            wd_seka_uniform_weight=getattr(args, 'uniform_weight', False),
+            prism_k_pt=args.prism_k_proj,
+            prism_k_gain=args.prism_k_gain,
+            prism_k_uniform_weight=getattr(args, 'uniform_weight', False),
         )
         tokenizer = model.tok
         if not args.add_marker:
-            logger.warning("WD-SEKA requires markers, setting add_marker to True.")
+            logger.warning("PRISM-K requires markers, setting add_marker to True.")
             args.add_marker = True
     elif args.seka:
         if "_tanh" in args.pos:
@@ -74,7 +75,7 @@ def main(args: argparse.Namespace):
         else:
             feature_fn = None
 
-        model = SEKALLM(
+        model = PrismLLM(
             args.model,
             pos_pt=args.pos,
             neg_pt=args.neg,
@@ -94,13 +95,13 @@ def main(args: argparse.Namespace):
         if not args.add_marker:
             logger.warning("SEKA LLM requires markers, setting add_marker to True.")
             args.add_marker = True
-    elif args.adaptive_seka:
+    elif args.adaptive_prism:
         if args.adaptive_expert_path is None:
-            raise ValueError("Adaptive SEKA requires an adaptive expert path.")
+            raise ValueError("AdaptivePrismLLM requires an adaptive expert path.")
 
         expert_path = json.load(open(args.adaptive_expert_path, "r"))
-        
-        model = AdaptiveSEKALLM(
+
+        model = AdaptivePrismLLM(
             args.model,
             expert_paths=expert_path,
             marker_start=args.marker_start,
@@ -112,12 +113,12 @@ def main(args: argparse.Namespace):
             # torch_dtype="auto",
             device="auto",
         )
-            
+
         tokenizer = model.tok
-        
+
         # Force add_marker flag to be True
         if not args.add_marker:
-            logger.warning("Adaptive SEKA LLM requires markers, setting add_marker to True.")
+            logger.warning("AdaptivePrismLLM requires markers, setting add_marker to True.")
             args.add_marker = True
     elif args.anchor:
         model = transformers.AutoModelForCausalLM.from_pretrained(
@@ -135,7 +136,7 @@ def main(args: argparse.Namespace):
         logger.info(f"Anchor steering requires markers, setting markers to {args.marker_start} and {args.marker_end}.")
     else:
         model = transformers.AutoModelForCausalLM.from_pretrained(
-            args.model, 
+            args.model,
             torch_dtype="auto",
             device_map="auto"
         )
@@ -146,15 +147,15 @@ def main(args: argparse.Namespace):
         if args.pasta:
             head_config = read_head_config(args.head_config)
             pasta = PASTA(
-                model, 
+                model,
                 tokenizer,
-                head_config=head_config, 
-                alpha=args.pasta_alpha, 
+                head_config=head_config,
+                alpha=args.pasta_alpha,
                 scale_position=args.scale_position,
             )
-    
+
     # Set up the evaluation data
-    data_path = os.path.join(args.data_path, "counterfact.jsonl")    
+    data_path = os.path.join(args.data_path, "counterfact.jsonl")
     logger.info("loading several data sources")
     dataset = load_dataset(
         data_path=data_path,
@@ -165,7 +166,7 @@ def main(args: argparse.Namespace):
 
     results_output_dir = Path(args.output_dir)
     results_output_dir.mkdir(exist_ok=True, parents=True)
-    
+
     logger.info(f"eval counterfact")
     if args.marker_end is None:
         args.marker_end = args.marker_start
@@ -177,7 +178,7 @@ def main(args: argparse.Namespace):
                 f"at {results_file}"
             )
             continue
-        
+
         if benchmark_name == "efficacy":
             results = counterfact_efficacy(
                 model=model,
@@ -188,7 +189,7 @@ def main(args: argparse.Namespace):
                 max_new_tokens=args.max_new_tokens,
                 add_unmediated_fact=args.add_unmediated_fact,
                 chat=args.chat,
-                seka=args.seka or args.adaptive_seka or args.wd_seka or args.kv_seka,
+                steering=args.seka or args.adaptive_prism or args.prism_k or args.prism_kv,
                 pasta=pasta,
                 anchor=args.anchor,
                 anchor_strength=args.anchor_strength,
@@ -206,7 +207,7 @@ def main(args: argparse.Namespace):
                 max_new_tokens=args.max_new_tokens,
                 add_unmediated_fact=args.add_unmediated_fact,
                 chat=args.chat,
-                seka=args.seka or args.adaptive_seka or args.wd_seka or args.kv_seka,
+                steering=args.seka or args.adaptive_prism or args.prism_k or args.prism_kv,
                 pasta=pasta,
                 anchor=args.anchor,
                 anchor_strength=args.anchor_strength,
@@ -229,7 +230,7 @@ def main(args: argparse.Namespace):
                 attribute_snippets=load_attribute_snippets(snippets_file),
                 tfidf_vectorizer=load_counterfact_tfidf_vectorizer(idf_file, vocab_file),
                 chat=args.chat,
-                seka=args.seka or args.adaptive_seka or args.wd_seka or args.kv_seka,
+                steering=args.seka or args.adaptive_prism or args.prism_k or args.prism_kv,
                 pasta=pasta,
                 add_marker=args.add_marker,
                 marker_start=args.marker_start,
@@ -237,19 +238,19 @@ def main(args: argparse.Namespace):
             )
         else:
             raise ValueError(f"unknown benchmark: {benchmark_name}")
-        
+
         logging.info(
             f"{benchmark_name} benchmark complete! results:\n%s",
             json.dumps(results.metrics.to_dict(), indent=1),
         )
-        
+
         with results_file.open("w") as f:
             json.dump(results.to_dict(), f, indent=4)
 
         metrics_file = results_output_dir / f"{benchmark_name}_metrics.json"
         with metrics_file.open("w") as f:
             json.dump(results.metrics.to_dict(), f, indent=4)
-    
+
 if __name__ == "__main__":
     setup_logger()
     BENCHMARKS = (
@@ -257,7 +258,7 @@ if __name__ == "__main__":
         "paraphrase",
         # "generation",
     )
-    
+
     parser = argparse.ArgumentParser(description="Evaluate CounterFact")
     parser.add_argument(
         "--model",
@@ -265,11 +266,11 @@ if __name__ == "__main__":
         type=str,
         help="model name or path",
     )
-    
+
     parser.add_argument(
-        "--data_path", 
-        type=str, 
-        required=True, 
+        "--data_path",
+        type=str,
+        required=True,
         help="Path to the data"
     )
     parser.add_argument(
@@ -281,7 +282,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--example_subset", type=str, default=None, help="run on a subset of data"
     )
-    
+
     parser.add_argument(
         "--output_dir",
         type=str,
@@ -289,7 +290,7 @@ if __name__ == "__main__":
         help="unique name for the experiment",
     )
     parser.add_argument("--overwrite_output_dir", action="store_true", help="")
-    
+
     parser.add_argument(
         "--benchmarks",
         "-b",
@@ -298,7 +299,7 @@ if __name__ == "__main__":
         default=BENCHMARKS,
         help="benchmarks to run, defaults depend on dataset",
     )
-    
+
     parser.add_argument("--batch_size", type=int, default=16, help="Batch size.")
     parser.add_argument("--max_length", type=int, default=None, help="Max sequence length.")
     parser.add_argument("--max_new_tokens", type=int, default=None, help="Max generation length.")
@@ -319,14 +320,14 @@ if __name__ == "__main__":
     parser.add_argument('--amplify_neg', default=0.5, type=float)
     parser.add_argument('--layers', default='last10',
                 help="'all' / 'last4' / '0,4,19' …")
-    
-    parser.add_argument("--adaptive-seka", action="store_true", default=False, help="Use adaptive SEKA model")
+
+    parser.add_argument("--adaptive-prism", action="store_true", default=False, help="Use Adaptive PRISM model")
     parser.add_argument("--adaptive-expert-path", type=str, default=None, help="Path to adaptive expert file")
     parser.add_argument("--adaptive_amplify_factor", type=float, default=1.0, help="Amplification factor for adaptive SEKA")
     parser.add_argument("--top_k_singular", type=int, default=5, help="Top k singular values for adaptive SEKA")
     parser.add_argument("--combination_method", type=str, default="weighted_top_k", choices=["weighted_top_k", "all_weighted", "top_k_uniform"], help="Combination method for adaptive SEKA")
 
-    
+
     parser.add_argument("--pasta", action="store_true", default=False, help="Use PASTA model")
     parser.add_argument("--head_config", type=str, default=None, help="PASTA head config for steering")
     parser.add_argument("--pasta_alpha", type=float, default=None, help="Scaling coefficient")
@@ -335,18 +336,18 @@ if __name__ == "__main__":
     parser.add_argument("--anchor", action="store_true", default=False, help="Use anchor steering")
     parser.add_argument("--anchor_strength", type=float, default=1.6, help="Anchor strength for steering")
 
-    parser.add_argument("--wd-seka", action="store_true", default=False, help="Use WD-SEKA (weighted differential)")
-    parser.add_argument("--wd-seka-proj", type=str, default=None, help="Path to WD-SEKA differential projection .pt")
-    parser.add_argument("--wd-seka-gain", type=float, default=1.0, help="WD-SEKA steering gain")
+    parser.add_argument("--prism-k", action="store_true", default=False, help="Use PRISM-K (weighted differential)")
+    parser.add_argument("--prism-k-proj", type=str, default=None, help="Path to PRISM-K differential projection .pt")
+    parser.add_argument("--prism-k-gain", type=float, default=1.0, help="PRISM-K steering gain")
     parser.add_argument("--uniform-weight", action="store_true", default=False, help="Use uniform weight w=1 instead of softplus (for ablation)")
 
-    parser.add_argument("--kv-seka", action="store_true", default=False, help="Use KV-SEKA (Key+Value joint steering)")
-    parser.add_argument("--kv-seka-proj", type=str, default=None, help="Path to KV-SEKA projection .pt")
-    parser.add_argument("--kv-seka-gain-k", type=float, default=0.4, help="KV-SEKA Key steering gain")
-    parser.add_argument("--kv-seka-gain-v", type=float, default=0.2, help="KV-SEKA Value steering gain")
+    parser.add_argument("--prism-kv", action="store_true", default=False, help="Use PRISM-KV (Key+Value joint steering)")
+    parser.add_argument("--prism-kv-proj", type=str, default=None, help="Path to PRISM-KV projection .pt")
+    parser.add_argument("--prism-kv-gain-k", type=float, default=0.4, help="PRISM-KV Key steering gain")
+    parser.add_argument("--prism-kv-gain-v", type=float, default=0.2, help="PRISM-KV Value steering gain")
 
     args = parser.parse_args()
 
-    assert sum([args.seka, args.adaptive_seka, args.wd_seka, args.kv_seka]) <= 1, "Cannot use multiple SEKA variants at the same time."
+    assert sum([args.seka, args.adaptive_prism, args.prism_k, args.prism_kv]) <= 1, "Cannot use multiple steering methods simultaneously."
 
     main(args)

@@ -1,4 +1,4 @@
-# src/custom_builders/synthetic_qa_builder.py
+"""Build PRISM projections from synthetic contrastive QA pairs."""
 from src.model import ProjectionBuilderBase
 
 import json
@@ -10,13 +10,16 @@ random.seed(42)
 
 
 class SynthQABuilder(ProjectionBuilderBase):
+    """Build differential projections from synthetic contrastive QA data."""
+
     def __init__(self, seed=42, **kwargs):
+        """Initialise builder with a fixed random seed for reproducibility."""
         super().__init__(**kwargs)
         self.seed = seed
         random.seed(seed)
 
     def iter_examples(self):
-        # Load all examples then shuffle with seed for reproducible subsampling
+        """Yield shuffled examples up to max_samples."""
         all_examples = []
         with open(self.data_path) as f:
             for line in f:
@@ -31,6 +34,7 @@ class SynthQABuilder(ProjectionBuilderBase):
             yield ex
 
     def get_triplets(self, ex: dict) -> list[tuple[str, str, str, str]]:
+        """Return (context, relevant_q, answer, irrelevant_q) tuples."""
         return [
             (ex['context_1'], ex['question_1'], ex['answer_1'], ex['question_2']),
             (ex['context_2'], ex['question_2'], ex['answer_2'], ex['question_1'])
@@ -63,13 +67,13 @@ if __name__ == '__main__':
     parser.add_argument('--svd-only', action='store_true',
                         help='Save only SVD components (equivalent to --save-svd --no-save-traditional)')
     parser.add_argument('--save-differential', action='store_true',
-                        help='WD-SEKA: Save differential cross-covariance projection with norm_diff weights')
+                        help='PRISM-K: Save differential cross-covariance projection with norm_diff weights')
     parser.add_argument('--diff-only', action='store_true',
-                        help='WD-SEKA: Save only differential projection')
+                        help='PRISM-K: Save only differential projection')
     parser.add_argument('--save-kv-differential', action='store_true',
-                        help='KV-SEKA: Save Key+Value differential projections')
+                        help='PRISM-KV: Save Key+Value differential projections')
     parser.add_argument('--kv-diff-only', action='store_true',
-                        help='KV-SEKA: Save only KV differential projection')
+                        help='PRISM-KV: Save only KV differential projection')
     parser.add_argument('--seed', type=int, default=42,
                         help='Random seed for data shuffling (for seed sensitivity experiments)')
 
@@ -105,7 +109,7 @@ if __name__ == '__main__':
     print(f"  Output formats:")
     print(f"    - Traditional projections: {args.save_traditional}")
     print(f"    - SVD components: {args.save_svd}")
-    print(f"    - Differential (WD-SEKA): {args.save_differential}")
+    print(f"    - Differential (PRISM-K): {args.save_differential}")
 
     builder = SynthQABuilder(
         model_path=args.model,

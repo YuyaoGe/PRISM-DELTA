@@ -1,4 +1,4 @@
-# utils.py  ────────────────────────────────────────────────────────────
+"""Tokenization helpers and feature-space transforms for PRISM steering."""
 import re, torch
 from typing import List, Tuple, Union
 from transformers import AutoTokenizer, AutoModel
@@ -63,8 +63,8 @@ def encode_with_markers(
 
 
 
-# ╭──────────────────────── 2. attach_k_projection ────────────────────╮
 def _parse_layers(spec: str, total: int):
+    """Parse a layer specification string into a list of layer indices."""
     if spec == 'all':
         return list(range(total))
     if spec.startswith('last'):
@@ -76,6 +76,7 @@ def _parse_layers(spec: str, total: int):
 
 
 def _load_proj(path: str, device):
+    """Load a projection tensor from disk and normalise to 4-D (L, H, d, d)."""
     obj = torch.load(path, map_location=device)
 
     # Unpack dict format
@@ -104,6 +105,7 @@ def _load_proj(path: str, device):
 
 
 def phi(x: torch.Tensor, name: str | None) -> torch.Tensor:
+    """Apply a feature-space transform (tanh, elu, or squared-exponential)."""
     if name is None:
         return x
     if name == 'squared-exponential':
@@ -117,6 +119,7 @@ def phi(x: torch.Tensor, name: str | None) -> torch.Tensor:
 
 
 def phi_inv(x: torch.Tensor, name: str | None) -> torch.Tensor:
+    """Apply the inverse of the feature-space transform."""
     if name is None:
         return x
     eps = torch.full_like(x, 1e-4).to(x.device)

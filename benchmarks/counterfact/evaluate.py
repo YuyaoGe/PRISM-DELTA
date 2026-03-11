@@ -27,7 +27,7 @@ from benchmarks.utils.pasta_utils import (
     weighted_n_gram_entropy
 )
 
-from src.model import SEKALLM
+from src.model import PrismLLM
 from pastalib.pasta import PASTA
 
 logger = logging.getLogger(__name__)
@@ -130,7 +130,7 @@ class CounterFactGenerationBenchmarkResults(DataClassJsonMixin):
 
 @torch.inference_mode()
 def counterfact_evaluate(
-    model: PreTrainedModel | SEKALLM,
+    model: PreTrainedModel | PrismLLM,
     tokenizer: PreTrainedTokenizer,
     dataset: Dataset,
     batch_size: int,
@@ -145,7 +145,7 @@ def counterfact_evaluate(
     marker_start: str | None = None,
     marker_end: str | None = None,
     chat: bool = False,
-    seka: bool = False,
+    steering: bool = False,
     pasta: PASTA | None = None,
     anchor: bool = False,
     anchor_strength: float = 20.0,
@@ -208,7 +208,7 @@ def counterfact_evaluate(
             #     json.dump(prompts, f, indent=4)
             #     assert False
             
-            if seka:
+            if steering:
                 outputs = model.generate(
                     ids=prompts,
                     steer=True,
@@ -397,17 +397,17 @@ def counterfact_efficacy(
     marker_start: str | None = None,
     marker_end: str | None = None,
     chat: bool = False,
-    seka: bool = False,
+    steering: bool = False,
     pasta: PASTA | None = None,
     anchor: bool = False,
     anchor_strength: float = 20.0,
 ):
     if desc is None:
         desc = "efficacy benchmark"
-        
+
     # Overwrite max_new_tokens
     max_new_tokens = 1
-    
+
     run = counterfact_evaluate(
         model=model,
         tokenizer=tokenizer,
@@ -424,7 +424,7 @@ def counterfact_efficacy(
         marker_start=marker_start,
         marker_end=marker_end,
         chat=chat,
-        seka=seka,
+        steering=steering,
         pasta=pasta,
         anchor=anchor,
         anchor_strength=anchor_strength,
@@ -499,7 +499,7 @@ def counterfact_paraphrase(
     marker_start: str | None = None,
     marker_end: str | None = None,
     chat: bool = False,
-    seka: bool = False,
+    steering: bool = False,
     pasta: PASTA | None = None,
     anchor: bool = False,
     anchor_strength: float = 20.0,
@@ -530,7 +530,7 @@ def counterfact_paraphrase(
         keep_in_memory=True,
         num_proc=1,
     )
-    
+
     efficacy_benchmark = counterfact_efficacy(
         model=model,
         tokenizer=tokenizer,
@@ -547,7 +547,7 @@ def counterfact_paraphrase(
         marker_start=marker_start,
         marker_end=marker_end,
         chat=chat,
-        seka=seka,
+        steering=steering,
         pasta=pasta,
         anchor=anchor,
         anchor_strength=anchor_strength,
@@ -679,7 +679,7 @@ def counterfact_generation(
     marker_start: str | None = None,
     marker_end: str | None = None,
     chat: bool = False,
-    seka: bool = False,
+    steering: bool = False,
     pasta: PASTA | None = None,
 ) -> CounterFactGenerationBenchmarkResults:
     """Run the CounterFact generation benchmark.
@@ -732,7 +732,7 @@ def counterfact_generation(
         marker_start=marker_start,
         marker_end=marker_end,
         chat=chat,
-        seka=seka,
+        steering=steering,
         pasta=pasta,
     )
     generations_key = "generations"

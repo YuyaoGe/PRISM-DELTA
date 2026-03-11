@@ -21,7 +21,7 @@ from benchmarks.utils.pasta_utils import (
 )
 from benchmarks.utils.typing_uils import Dataset
 
-from src.model import SEKALLM, AdaptiveSEKALLM
+from src.model import PrismLLM, AdaptivePrismLLM
 from src.utils import encode_with_markers
 from pastalib.pasta import PASTA
 
@@ -126,7 +126,7 @@ def load_biasbios_tfidf_vectorizer(data_path: str) -> TfidfVectorizer:
 
 @torch.inference_mode()
 def biasbios_prediction_evaluation(
-    model: PreTrainedModel | SEKALLM | AdaptiveSEKALLM,
+    model: PreTrainedModel | PrismLLM | AdaptivePrismLLM,
     tokenizer: PreTrainedTokenizer,
     dataset: Dataset,
     data_path: str,
@@ -140,7 +140,7 @@ def biasbios_prediction_evaluation(
     marker_start: str | None = None,
     marker_end: str | None = None,
     chat: bool = False,
-    seka: bool = False,
+    steering: bool = False,
     pasta: PASTA | None = None,
     anchor: bool = False,
     anchor_strength: float = 1.6,
@@ -219,7 +219,7 @@ def biasbios_prediction_evaluation(
                     add_generation_prompt=True,
                 ) for prompt in prompts]
 
-            if seka:
+            if steering:
                 input_ids, steer_mask, attention_mask = encode_with_markers(
                     prompts, tokenizer,
                     marker_start, marker_end)
@@ -390,12 +390,12 @@ def biasbios_prediction_evaluation(
 
 @torch.inference_mode()
 def biasbios_instruction_evaluation(
-    model: PreTrainedModel | SEKALLM | AdaptiveSEKALLM,
+    model: PreTrainedModel | PrismLLM | AdaptivePrismLLM,
     tokenizer: PreTrainedTokenizer,
     dataset: Dataset,
     data_path: str,
-    task: str, 
-    prompt_idx: int | list | None = None, 
+    task: str,
+    prompt_idx: int | list | None = None,
     references: dict | None = None,
     batch_size: int = 16,
     top_k: int = 3,
@@ -406,7 +406,7 @@ def biasbios_instruction_evaluation(
     marker_start: str | None = None,
     marker_end: str | None = None,
     chat: bool = False,
-    seka: bool = False,
+    steering: bool = False,
     pasta: PASTA | None = None,
     anchor: bool = False,
     anchor_strength: float = 1.6,
@@ -493,7 +493,7 @@ def biasbios_instruction_evaluation(
                     add_generation_prompt=True,
                 ) for prompt in prompts]
 
-            if seka:
+            if steering:
                 input_ids, steer_mask, attention_mask = encode_with_markers(
                     prompts,
                     tokenizer,

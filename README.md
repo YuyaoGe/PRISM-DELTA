@@ -131,4 +131,4 @@ PRISM-Delta learns discriminative subspaces from synthetic contrastive data offl
 
 ## Acknowledgments
 
-This work builds on [SEKA](https://github.com/waylonli/SEKA) (Li et al., ICLR 2026).
+This work builds on [**SEKA**](https://github.com/waylonli/SEKA), [**SEA-LLM**](https://github.com/yfqiu-nlp/sea-llm), [**PASTA**](https://github.com/QingruZhang/PASTA), [**Selective Prompt Anchoring**](https://github.com/magic-YuanTian/Selective-Prompt-Anchoring).

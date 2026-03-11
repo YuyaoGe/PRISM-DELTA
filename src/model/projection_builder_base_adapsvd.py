@@ -1,4 +1,4 @@
-# src/model/projection_builder_base.py
+"""Adaptive SVD projection builder with attention-based sample validation."""
 from __future__ import annotations
 import abc, torch
 import os
@@ -17,6 +17,8 @@ torch.set_grad_enabled(False)
 
 
 class ProjectionBuilderBase(abc.ABC):
+    """Abstract base for building adaptive SVD projections with attention validation."""
+
     def __init__(
             self,
             model_path: str,
@@ -88,6 +90,7 @@ class ProjectionBuilderBase(abc.ABC):
         ...
         
     def assemble_texts(self, ctx: str, rel_q: str):
+        """Format context and question into neutral and prompted text pairs."""
         if self.chat:
             text_H = self.tokenizer.apply_chat_template([{"role": "user", "content": f"Context: {ctx}"}],
                                                         tokenize=False)
@@ -145,7 +148,7 @@ class ProjectionBuilderBase(abc.ABC):
 
 
     def run(self, output_dir):
-        # 1) buffers per layer, per head
+        """Extract keys, validate via attention, compute and save projections."""
         num_layers = len(self.layers)
         n_kv = self.model.config.num_key_value_heads if "gemma3" not in self.model.__class__.__name__.lower() else self.model.config.text_config.num_key_value_heads
         buf_H = [[[] for _ in range(n_kv)] for _ in range(num_layers)]
