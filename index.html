@@ -5,10 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PRISM-Delta: Projection-based Relevance-Informed Steering Method</title>
   <meta name="description" content="PRISM-Delta steers both Key and Value channels of Transformer attention via differential cross-covariance decomposition. Training-free, FlashAttention compatible.">
+  <link rel="icon" type="image/png" href="assets/logo.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
+  <script>
+    MathJax = {
+      tex: { inlineMath: [['$','$']], displayMath: [['$$','$$']] },
+      svg: { fontCache: 'global' },
+      startup: { typeset: true }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" async></script>
 </head>
 <body>
 
@@ -16,6 +25,7 @@
   <section id="hero">
     <canvas id="particle-canvas"></canvas>
     <div class="hero-content">
+      <img src="assets/logo.png" alt="PRISM-Delta logo" class="hero-logo">
       <h1 class="hero-title">PRISM<span class="delta">-&Delta;</span></h1>
       <p class="hero-tagline">Projection-based Relevance-Informed Steering Method</p>
       <p class="hero-sub">Training-free attention steering via differential cross-covariance decomposition.<br>Compatible with FlashAttention. Negligible memory overhead.</p>
@@ -35,10 +45,19 @@
     </div>
   </section>
 
-  <!-- ═══════════ METHOD ═══════════ -->
+  <!-- ═══════════ OVERVIEW FIGURE ═══════════ -->
+  <section id="figure">
+    <div class="container">
+      <div class="figure-wrapper fade-in">
+        <img src="assets/overview.png" alt="PRISM-Delta method overview" loading="lazy">
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════ METHOD OVERVIEW ═══════════ -->
   <section id="method">
     <div class="container">
-      <h2 class="section-title fade-in">How It Works</h2>
+      <h2 class="section-title fade-in">Method</h2>
       <div class="method-grid">
         <div class="method-card fade-in">
           <div class="card-icon">
@@ -51,7 +70,7 @@
             </svg>
           </div>
           <h3>Differential Cross-Covariance</h3>
-          <p>SVD of &Omega;<sub>&Delta;</sub> = &Omega;<sup>+</sup> &minus; &Omega;<sup>&minus;</sup> extracts directions that distinguish relevant from irrelevant conditions, automatically eliminating shared variance.</p>
+          <p>SVD of $\Omega_\Delta = \Omega^+ - \Omega^-$ extracts directions that distinguish relevant from irrelevant conditions, automatically eliminating shared variance.</p>
         </div>
         <div class="method-card fade-in">
           <div class="card-icon">
@@ -64,7 +83,7 @@
             </svg>
           </div>
           <h3>Softplus Head Weighting</h3>
-          <p>Each attention head receives a continuous importance weight based on its discriminability score, replacing binary hard thresholds with smooth gradation.</p>
+          <p>Each attention head receives a continuous importance weight $w_{\ell,h} = \text{softplus}(D_{\ell,h} - \delta_{\min})$, replacing binary hard thresholds with smooth gradation.</p>
         </div>
         <div class="method-card fade-in">
           <div class="card-icon">
@@ -79,17 +98,102 @@
             </svg>
           </div>
           <h3>Dual-Channel Steering</h3>
-          <p>Optionally steers both Key (routing) and Value (content) channels simultaneously, enabling fine-grained control over information flow.</p>
+          <p>Steers both Key (routing) and Value (content) channels simultaneously, enabling fine-grained control over information flow at inference time.</p>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- ═══════════ OVERVIEW FIGURE ═══════════ -->
-  <section id="figure">
+  <!-- ═══════════ SPECTRAL LEARNING ═══════════ -->
+  <section id="spectral-learning">
     <div class="container">
-      <div class="figure-wrapper fade-in">
-        <img src="assets/overview.png" alt="PRISM-Delta method overview" loading="lazy">
+      <h2 class="section-title fade-in">Spectral Learning of Relevance-Aligned Projections</h2>
+      <div class="method-detail fade-in">
+        <p>
+          Using token-level key embeddings from synthetic contrastive prompts &mdash; denoted $\mathbf{h}$ (neutral), $\mathbf{h}^+$ (positive), and $\mathbf{h}^-$ (negative) &mdash; we compute cross-covariance matrices for each transformer layer $\ell$ and head $h$:
+        </p>
+        <div class="math-block">
+          $$ \Omega^+_{\ell,h} = \frac{\mathbf{h}^\top \mathbf{h}^+}{n}, \quad \Omega^-_{\ell,h} = \frac{\mathbf{h}^\top \mathbf{h}^-}{n} $$
+        </div>
+        <p>
+          SVD is then applied: $\Omega^+_{\ell,h} = U^+ S^+ V^{+\top}$, $\Omega^-_{\ell,h} = U^- S^- V^{-\top}$.
+          The projection matrices are constructed from the top singular vectors:
+        </p>
+        <div class="math-block">
+          $$ P^+_{\ell,h} = U^+_{\ell,h,:,:k^+} \left(U^+_{\ell,h,:,:k^+}\right)^\top, \quad P^-_{\ell,h} = U^-_{\ell,h,:,k^-:} \left(U^-_{\ell,h,:,k^-:}\right)^\top $$
+        </div>
+        <p>
+          where $k^+$ and $k^-$ are chosen such that they capture at least a proportion $\gamma$ of the total singular value sum:
+        </p>
+        <div class="math-block">
+          $$ \frac{\sum_{i=1}^{k^+} S^+_{\ell,h,i}}{\sum_{i=1}^{d_k} S^+_{\ell,h,i}} \geq \gamma $$
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════ INFERENCE-TIME STEERING ═══════════ -->
+  <section id="inference">
+    <div class="container">
+      <h2 class="section-title fade-in">Inference-Time Spectral Editing</h2>
+      <div class="method-detail fade-in">
+        <p>
+          During inference, learned projections are injected into key embeddings before attention scores are computed. For each token key $\mathbf{k}_j \in \mathbb{R}^{d_k}$ at layer $\ell$ and head $h$:
+        </p>
+        <div class="math-block">
+          $$ \mathbf{k}_j' = \mathbf{k}_j + \frac{g^+ \cdot P^+_{\ell,h}\, \mathbf{k}_j + g^- \cdot P^-_{\ell,h}\, \mathbf{k}_j}{2} $$
+        </div>
+        <p>
+          where $g^+, g^-$ are independently adjustable scalars controlling positive and negative steering gains. This is algebraically equivalent to augmenting the attention score matrix $A$ with a low-rank relevance bias $B$:
+        </p>
+        <div class="math-block">
+          $$ \text{Logits}_{ij} = \underbrace{\frac{\mathbf{q}_i^\top \mathbf{k}_j}{\sqrt{d_k}}}_{A_{ij}} + \underbrace{\frac{\mathbf{q}_i^\top \left(\frac{g^+ \cdot P^+_{\ell,h}\, \mathbf{k}_j + g^- \cdot P^-_{\ell,h}\, \mathbf{k}_j}{2}\right)}{\sqrt{d_k}}}_{B_{ij}} $$
+        </div>
+        <p>
+          Because the method operates entirely on key representations prior to attention computation, it requires no access to the attention matrix, making it inherently compatible with FlashAttention.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════ ADAPTIVE VARIANT ═══════════ -->
+  <section id="adaptive">
+    <div class="container">
+      <h2 class="section-title fade-in">Query-Adaptive Expert Routing</h2>
+      <div class="method-detail fade-in">
+        <p>
+          The adaptive variant maintains multiple domain-specific expert projections $\{U^+_{m,\ell,h}\}_{m=1}^M$ and routes them based on query alignment. At inference time, the query vector $\mathbf{q}_{\ell,h}$ of the last prompt token is used to compute dynamic coefficients:
+        </p>
+        <div class="math-block">
+          $$ \alpha_{m,\ell,h}(\mathbf{q}_{\ell,h}) = \frac{\sum_{k=1}^{K} (\mathbf{q}_{\ell,h}^{\top}\, \mathbf{u}^{+(k)}_{m,\ell,h}) \cdot \sigma^{+(k)}_{m,\ell,h}}{\max_m \left| \sum_{k=1}^{K} (\mathbf{q}_{\ell,h}^{\top}\, \mathbf{u}^{+(k)}_{m,\ell,h}) \cdot \sigma^{+(k)}_{m,\ell,h} \right|} $$
+        </div>
+        <p>
+          The final projection is a weighted combination of expert projections:
+        </p>
+        <div class="math-block">
+          $$ P_{\text{dyn},\ell,h}(\mathbf{q}_{\ell,h}) = \sum_{m=1}^{M} \alpha_{m,\ell,h}(\mathbf{q}_{\ell,h}) \cdot U^+_{m,\ell,h,:,:K}\, (U^+_{m,\ell,h,:,:K})^\top $$
+        </div>
+        <p>
+          The key transformation during inference becomes: $\mathbf{k}_j' = \mathbf{k}_j + g \cdot P_{\text{dyn},\ell,h}(\mathbf{q}_{\ell,h})\, \mathbf{k}_j$.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════ HEAD SELECTION ═══════════ -->
+  <section id="head-selection">
+    <div class="container">
+      <h2 class="section-title fade-in">Relevance-Sensitive Head Selection</h2>
+      <div class="method-detail fade-in">
+        <p>
+          Steering is most effective when applied selectively to KV heads that are naturally sensitive to prompt relevance. For each layer $\ell$ and head $h$, the average per-token $\ell_2$ distance is:
+        </p>
+        <div class="math-block">
+          $$ D_{\ell,h} = \frac{1}{N} \sum_{i=1}^{N} \left\| \mathbf{h}^+_{\ell,h,i} - \mathbf{h}^-_{\ell,h,i} \right\|_2 $$
+        </div>
+        <p>
+          Projection is applied only if $D_{\ell,h} \geq \delta_{\min}$, where $\delta_{\min}$ is a tunable threshold. Mid-to-late layers consistently show larger separation, aligning with recent findings on retrieval head localisation.
+        </p>
       </div>
     </div>
   </section>
@@ -97,12 +201,12 @@
   <!-- ═══════════ RESULTS ═══════════ -->
   <section id="results">
     <div class="container">
-      <h2 class="section-title fade-in">Key Results</h2>
+      <h2 class="section-title fade-in">At a Glance</h2>
       <div class="results-grid">
         <div class="result-card fade-in">
           <div class="result-number">5</div>
           <div class="result-label">Models Supported</div>
-          <div class="result-detail">Qwen3 (4B/8B/14B) &middot; Gemma3 (4B/12B)</div>
+          <div class="result-detail">Qwen3 (4B / 8B / 14B) &middot; Gemma3 (4B / 12B)</div>
         </div>
         <div class="result-card fade-in">
           <div class="result-number">3</div>
