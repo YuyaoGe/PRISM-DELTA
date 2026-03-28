@@ -1,7 +1,7 @@
 #!/bin/bash
 
 export PYTHONPATH=./
-export CUDA_VISIBLE_DEVICES=14
+export CUDA_VISIBLE_DEVICES=0
 
 MODEL_NAME=Qwen3-14B-Base
 
@@ -18,8 +18,8 @@ for entry in "$CONFIG_DIR"/*.json; do
         echo "Processing: $config_name"
         echo "==========================="
         python benchmarks/eval_fact_gen.py \
-            --model /mnt/data/models/$MODEL_NAME \
-            --data_path data/counterfact \
+            --model <path-to-model> \
+            --data_path <path-to-counterfact> \
             --add_unmediated_fact True \
             --benchmarks efficacy paraphrase \
             --output_dir pastalib/profiler/profile/$MODEL_NAME/counterfact/$config_name \

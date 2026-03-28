@@ -1,7 +1,7 @@
 #!/bin/bash
 
 export PYTHONPATH=./
-export CUDA_VISIBLE_DEVICES=15
+export CUDA_VISIBLE_DEVICES=0
 
 MODEL_NAME=Qwen3-4B-Base
 
@@ -18,8 +18,8 @@ for entry in "$CONFIG_DIR"/*.json; do
         echo "Processing: $config_name"
         echo "==========================="
         python benchmarks/eval_bias_gen.py \
-            --model /mnt/data/models/$MODEL_NAME \
-            --data_path data/biasbios/biasbios.json \
+            --model <path-to-model> \
+            --data_path <path-to-biasbios.json> \
             --output_dir pastalib/profiler/profile/$MODEL_NAME/biasbios/$config_name \
             --batch_size 64 \
             --max_new_tokens 32 \
@@ -34,4 +34,3 @@ done
 
 duration=$(( SECONDS - start ))
 echo "Script took $duration seconds"
-
