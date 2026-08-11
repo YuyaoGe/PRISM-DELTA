@@ -6,7 +6,6 @@
 [![Projections](https://img.shields.io/badge/📦%20Projections-Prism__Delta-orange)](https://huggingface.co/YuyaoGe/Prism_Delta)
 [![Stars](https://img.shields.io/github/stars/YuyaoGe/PRISM-DELTA?style=social)]()
 
-**Official implementation of the COLM 2026 paper "Prism-Δ: Differential Subspace Steering for Prompt Highlighting in Large Language Models"** by *Yuyao Ge, Shenghua Liu, Yiwei Wang, Baolong Bi, Lingrui Mei, Jiayu Yao, Tianyu Liu, Jiafeng Guo,* and *Xueqi Cheng*.
 
 PRISM-Δ is a **training-free** method that makes a language model prioritize the spans a user has highlighted. It decomposes the difference between positive and negative cross-covariance matrices so that structure shared by relevant and irrelevant contexts cancels out, weights every attention head by a continuous softplus score instead of a hard threshold, and edits Key — optionally also Value — vectors in place. No fine-tuning, no extra forward passes, compatible with FlashAttention.
 
@@ -17,15 +16,17 @@ PRISM-Δ is a **training-free** method that makes a language model prioritize th
 
 ## Contents
 - [Key ideas](#key-ideas)
-- [Repo layout](#repo-layout)
-- [Quick start](#quick-start)
-  - [1. Install](#1-install)
-  - [2. Get models, data and projections](#2-get-models-data-and-projections)
-  - [3. Run](#3-run)
-- [Other benchmarks](#other-benchmarks)
+- [Installation](#installation)
+- [Quick Start: BiasBios Demo](#quick-start-biasbios-demo)
+  - [Step 0: Download models and data](#step-0-download-models-and-data)
+  - [Step 1: Build projection](#step-1-build-projection)
+  - [Step 2: Run evaluation](#step-2-run-evaluation)
+- [CounterFact](#counterfact)
+- [Pronoun Change](#pronoun-change)
 - [Recommended hyperparameters](#recommended-hyperparameters)
+- [Method Overview](#method-overview)
 - [Citation](#citation)
-- [Acknowledgements](#acknowledgements)
+- [Acknowledgments](#acknowledgments)
 
 ## Key ideas
 
@@ -37,90 +38,96 @@ PRISM-Δ is a **training-free** method that makes a language model prioritize th
 - **Softplus head weighting.** Each head gets a continuous importance weight from its discriminability score, so a weak-but-useful head contributes at reduced strength rather than being switched off by a threshold.
 - **Dual-channel steering.** The same construction extends from the Key (routing) channel to the Value (content) channel, giving PRISM-ΔV, which recovers fluency that Key-only steering costs.
 
-## Repo layout
-```
-src/
-  model/
-    prism_llm.py                    # inference-time steering (Key / Key+Value)
-    adaptive_prism_llm.py           # query-adaptive multi-expert variant
-    projection_builder_base.py      # cross-covariance extraction + differential SVD
-  custom_builders/
-    synthetic_qa_builder.py         # build projections from contrastive triplets
-benchmarks/
-  eval_bias_gen.py                  # BiasBios
-  eval_fact_gen.py                  # CounterFact
-  eval_biasbios_instruction.py      # Pronoun Change
-pastalib/                           # PASTA baseline + head profiling configs
-data/synthetic/pair_qa_new.jsonl    # contrastive data for projection building
-```
+## Installation
 
-## Quick start
-
-### 1. Install
 ```bash
 pip install -r requirements.txt
 python -m spacy download en_core_web_sm
 python -c "import nltk; nltk.download('punkt_tab')"
 ```
 
-### 2. Get models, data and projections
+## Quick Start: BiasBios Demo
 
-**Models** — any of [Qwen3-4B-Base](https://huggingface.co/Qwen/Qwen3-4B-Base), [Qwen3-8B-Base](https://huggingface.co/Qwen/Qwen3-8B-Base), [Qwen3-14B-Base](https://huggingface.co/Qwen/Qwen3-14B-Base), [gemma-3-4b-pt](https://huggingface.co/google/gemma-3-4b-pt), [gemma-3-12b-pt](https://huggingface.co/google/gemma-3-12b-pt).
+### Step 0: Download models and data
 
-**Data** — [SEKA-datasets](https://huggingface.co/datasets/waylonli/SEKA-datasets) covers BiasBios, CounterFact (`pasta_bench`) and Pronoun Change. Extract it under a local directory such as `./datasets/`.
+**Models** (any of the following):
 
-**Projections** — download the precomputed ones and skip building:
+| Model | HuggingFace Link |
+|-------|-----------------|
+| Qwen3-4B-Base | [Qwen/Qwen3-4B-Base](https://huggingface.co/Qwen/Qwen3-4B-Base) |
+| Qwen3-8B-Base | [Qwen/Qwen3-8B-Base](https://huggingface.co/Qwen/Qwen3-8B-Base) |
+| Qwen3-14B-Base | [Qwen/Qwen3-14B-Base](https://huggingface.co/Qwen/Qwen3-14B-Base) |
+| Gemma3-4B-PT | [google/gemma-3-4b-pt](https://huggingface.co/google/gemma-3-4b-pt) |
+| Gemma3-12B-PT | [google/gemma-3-12b-pt](https://huggingface.co/google/gemma-3-12b-pt) |
+
+**Dataset**: Download [SEKA-datasets](https://huggingface.co/datasets/waylonli/SEKA-datasets) and place under a local directory (e.g., `./datasets/`). This includes BiasBios, CounterFact (pasta\_bench), and Pronoun Change evaluation data.
+
+**Projections** (optional): precomputed projections for all five models on all three benchmarks are available at [YuyaoGe/Prism_Delta](https://huggingface.co/YuyaoGe/Prism_Delta), along with the per-configuration hyperparameters. Download them to skip Step 1.
+
 ```bash
 git clone https://huggingface.co/YuyaoGe/Prism_Delta ./projections
 ```
-or build them yourself (3–8 minutes per model on one GPU):
-```bash
-# PRISM-Δ (Key-only)
-python src/custom_builders/synthetic_qa_builder.py \
-  --model <path-to-model> --data data/synthetic/pair_qa_new.jsonl \
-  --output_dir ./projections/biasbios/prism \
-  --max_samples 200 --min_diff 0.08 --top_pct 0.998 --diff-only
 
-# PRISM-ΔV (Key + Value)
-python src/custom_builders/synthetic_qa_builder.py \
-  --model <path-to-model> --data data/synthetic/pair_qa_new.jsonl \
+### Step 1: Build projection
+
+Skip this step if you downloaded the precomputed projections above.
+
+```bash
+# PRISM-K (Key-only differential projection)
+CUDA_VISIBLE_DEVICES=0 python src/custom_builders/synthetic_qa_builder.py \
+  --model <path-to-model> \
+  --data data/synthetic/pair_qa_new.jsonl \
+  --output_dir ./projections/biasbios/prism \
+  --max_samples 200 --min_diff 0.08 --top_pct 0.998 \
+  --diff-only
+
+# PRISM-KV (Key+Value differential projection)
+CUDA_VISIBLE_DEVICES=0 python src/custom_builders/synthetic_qa_builder.py \
+  --model <path-to-model> \
+  --data data/synthetic/pair_qa_new.jsonl \
   --output_dir ./projections/biasbios/prism-kv \
-  --max_samples 200 --min_diff 0.08 --top_pct 0.998 --kv-diff-only
+  --max_samples 200 --min_diff 0.08 --top_pct 0.998 \
+  --kv-diff-only
 ```
 
-### 3. Run
+### Step 2: Run evaluation
+
 ```bash
 export PYTHONPATH=$(pwd)
 
 # Vanilla (no steering)
-python benchmarks/eval_bias_gen.py \
-  --model <path-to-model> --data_path <path-to-biasbios.json> \
+CUDA_VISIBLE_DEVICES=0 python benchmarks/eval_bias_gen.py \
+  --model <path-to-model> \
+  --data_path <path-to-biasbios.json> \
   --output_dir ./results/vanilla \
   --overwrite_output_dir --batch_size 256 --max_new_tokens 64
 
-# PRISM-Δ
-python benchmarks/eval_bias_gen.py \
-  --model <path-to-model> --data_path <path-to-biasbios.json> \
+# PRISM-K
+CUDA_VISIBLE_DEVICES=0 python benchmarks/eval_bias_gen.py \
+  --model <path-to-model> \
+  --data_path <path-to-biasbios.json> \
   --output_dir ./results/prism-k \
   --overwrite_output_dir --batch_size 256 --max_new_tokens 64 \
-  --wd-seka --wd-seka-proj <path-to-diff_proj.pt> \
+  --wd-seka --wd-seka-proj ./projections/biasbios/prism/<model-name>_diff_proj.pt \
   --wd-seka-gain 0.40 --layers all
 
-# PRISM-ΔV
-python benchmarks/eval_bias_gen.py \
-  --model <path-to-model> --data_path <path-to-biasbios.json> \
+# PRISM-KV
+CUDA_VISIBLE_DEVICES=0 python benchmarks/eval_bias_gen.py \
+  --model <path-to-model> \
+  --data_path <path-to-biasbios.json> \
   --output_dir ./results/prism-kv \
   --overwrite_output_dir --batch_size 256 --max_new_tokens 64 \
-  --kv-seka --kv-seka-proj <path-to-kv_diff_proj.pt> \
+  --kv-seka --kv-seka-proj ./projections/biasbios/prism-kv/<model-name>_kv_diff_proj.pt \
   --kv-seka-gain-k 0.40 --kv-seka-gain-v 0.10 --layers all
 ```
 
-## Other benchmarks
+### CounterFact
 
-**CounterFact** (test split `5000:10000`):
 ```bash
-python benchmarks/eval_fact_gen.py \
-  --model <path-to-model> --data_path <path-to-pasta_bench> \
+# PRISM-K on CounterFact (test set: 5000:10000)
+CUDA_VISIBLE_DEVICES=0 python benchmarks/eval_fact_gen.py \
+  --model <path-to-model> \
+  --data_path <path-to-pasta_bench> \
   --output_dir ./results/counterfact/prism-k \
   --overwrite_output_dir --batch_size 128 --max_new_tokens 32 \
   --example_subset 5000:10000 \
@@ -128,10 +135,13 @@ python benchmarks/eval_fact_gen.py \
   --wd-seka-gain 2.50 --layers all
 ```
 
-**Pronoun Change** (test split `5000:10000`):
+### Pronoun Change
+
 ```bash
-python benchmarks/eval_biasbios_instruction.py \
-  --model <path-to-model> --data_path <path-to-biasbios.json> \
+# PRISM-K on Pronoun Change (test set: 5000:10000)
+CUDA_VISIBLE_DEVICES=0 python benchmarks/eval_biasbios_instruction.py \
+  --model <path-to-model> \
+  --data_path <path-to-biasbios.json> \
   --output_dir ./results/pronoun/prism-k \
   --overwrite_output_dir --batch_size 64 --max_new_tokens 128 \
   --task pronchange --example_subset 5000:10000 \
@@ -139,27 +149,40 @@ python benchmarks/eval_biasbios_instruction.py \
   --wd-seka-gain 0.05 --layers all
 ```
 
-## Recommended hyperparameters
-
-`gamma` and `delta_min` are build-time settings; `g_K` is applied at inference. Per-benchmark values for every configuration are listed on the [projections page](https://huggingface.co/YuyaoGe/Prism_Delta) and in the paper's appendix.
+### Recommended hyperparameters
 
 | Model | gamma | delta_min | g_K | Batch Size |
 |-------|-------|-----------|-----|------------|
 | [Qwen3-4B-Base](https://huggingface.co/Qwen/Qwen3-4B-Base) | 0.998 | 0.08 | 0.40 | 256 |
 | [Qwen3-8B-Base](https://huggingface.co/Qwen/Qwen3-8B-Base) | 0.998 | 0.08 | 0.40 | 128 |
 | [Qwen3-14B-Base](https://huggingface.co/Qwen/Qwen3-14B-Base) | 0.998 | 0.08 | 0.40 | 64 |
-| [gemma-3-4b-pt](https://huggingface.co/google/gemma-3-4b-pt) | 0.850 | 0.08 | 0.50 | 256 |
-| [gemma-3-12b-pt](https://huggingface.co/google/gemma-3-12b-pt) | 0.990 | 0.04 | 0.40 | 64 |
+| [Gemma3-4B-PT](https://huggingface.co/google/gemma-3-4b-pt) | 0.850 | 0.08 | 0.50 | 256 |
+| [Gemma3-12B-PT](https://huggingface.co/google/gemma-3-12b-pt) | 0.990 | 0.04 | 0.40 | 64 |
+
+## Method Overview
+
+PRISM-Delta learns discriminative subspaces from synthetic contrastive data offline, then applies per-head weighted projections at inference time:
+
+1. **Differential cross-covariance**: SVD of (Omega+ - Omega-) extracts directions that distinguish relevant from irrelevant conditions, automatically eliminating shared variance.
+2. **Softplus head weighting**: Each head receives a continuous importance weight based on its discriminability score, replacing binary hard thresholds.
+3. **Dual-channel steering**: Optionally steers both Key (routing) and Value (content) channels simultaneously.
 
 ## Citation
+
 ```bibtex
-@inproceedings{ge2026prism,
-  title={Prism-$\Delta$: Differential Subspace Steering for Prompt Highlighting in Large Language Models},
-  author={Ge, Yuyao and Liu, Shenghua and Wang, Yiwei and Bi, Baolong and Mei, Lingrui and Yao, Jiayu and Liu, Tianyu and Guo, Jiafeng and Cheng, Xueqi},
-  booktitle={Conference on Language Modeling (COLM)},
-  year={2026}
+@misc{ge2026prism,
+  title         = {Prism-$\Delta$: Differential Subspace Steering for Prompt
+                   Highlighting in Large Language Models},
+  author        = {Yuyao Ge and Shenghua Liu and Yiwei Wang and Baolong Bi and
+                   Lingrui Mei and Jiayu Yao and Jiafeng Guo and Xueqi Cheng},
+  year          = {2026},
+  eprint        = {2603.10705},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.CL},
+  url           = {https://arxiv.org/abs/2603.10705}
 }
 ```
 
-## Acknowledgements
-This work builds on [**SEKA**](https://github.com/waylonli/SEKA), [**SEA-LLM**](https://github.com/yfqiu-nlp/sea-llm), [**PASTA**](https://github.com/QingruZhang/PASTA), and [**Selective Prompt Anchoring**](https://github.com/magic-YuanTian/Selective-Prompt-Anchoring).
+## Acknowledgments
+
+This work builds on [**SEKA**](https://github.com/waylonli/SEKA), [**SEA-LLM**](https://github.com/yfqiu-nlp/sea-llm), [**PASTA**](https://github.com/QingruZhang/PASTA), [**Selective Prompt Anchoring**](https://github.com/magic-YuanTian/Selective-Prompt-Anchoring).
