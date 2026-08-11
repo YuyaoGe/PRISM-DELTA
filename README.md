@@ -2,6 +2,7 @@
 
 [![arXiv](https://img.shields.io/static/v1?label=arXiv&message=2603.10705&color=red&logo=arxiv)](https://arxiv.org/abs/2603.10705)
 [![Paper (PDF)](https://img.shields.io/badge/Paper-PDF-blue)](https://arxiv.org/pdf/2603.10705)
+[![Live Demo](https://img.shields.io/badge/🌐%20Live-Demo-brightgreen)](https://geyuyao.com/publication/ge2026prism/)
 [![Hugging Face Papers](https://img.shields.io/badge/🤗%20Hugging%20Face-Paper-yellow)](https://huggingface.co/papers/2603.10705)
 [![Projections](https://img.shields.io/badge/📦%20Projections-Prism__Delta-orange)](https://huggingface.co/YuyaoGe/Prism_Delta)
 [![Stars](https://img.shields.io/github/stars/YuyaoGe/PRISM-DELTA?style=social)]()
@@ -62,7 +63,7 @@ python -c "import nltk; nltk.download('punkt_tab')"
 
 **Dataset**: Download [SEKA-datasets](https://huggingface.co/datasets/waylonli/SEKA-datasets) and place under a local directory (e.g., `./datasets/`). This includes BiasBios, CounterFact (pasta\_bench), and Pronoun Change evaluation data.
 
-**Projections** (optional): precomputed projections for all five models on all three benchmarks are available at [YuyaoGe/Prism_Delta](https://huggingface.co/YuyaoGe/Prism_Delta), along with the per-configuration hyperparameters. Download them to skip Step 1.
+**Projections** (optional): precomputed projections for all five models on all three benchmarks are available at [Here](https://huggingface.co/YuyaoGe/Prism_Delta), along with the per-configuration hyperparameters. Download them to skip Step 1.
 
 ```bash
 git clone https://huggingface.co/YuyaoGe/Prism_Delta ./projections
