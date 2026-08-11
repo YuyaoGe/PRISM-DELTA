@@ -4,6 +4,8 @@
 
 PRISM-Delta steers both Key and Value channels of Transformer attention via differential cross-covariance decomposition and per-head softplus weighting. It is training-free, compatible with FlashAttention, and adds negligible memory overhead.
 
+Precomputed projections: [YuyaoGe/Prism_Delta](https://huggingface.co/YuyaoGe/Prism_Delta)
+
 <p align="center">
   <img src="assets/overview.png" width="90%">
 </p>
@@ -32,7 +34,15 @@ python -c "import nltk; nltk.download('punkt_tab')"
 
 **Dataset**: Download [SEKA-datasets](https://huggingface.co/datasets/waylonli/SEKA-datasets) and place under a local directory (e.g., `./datasets/`). This includes BiasBios, CounterFact (pasta\_bench), and Pronoun Change evaluation data.
 
+**Projections** (optional): precomputed projections for all five models on all three benchmarks are available at [YuyaoGe/Prism_Delta](https://huggingface.co/YuyaoGe/Prism_Delta), along with the per-configuration hyperparameters. Download them to skip Step 1.
+
+```bash
+git clone https://huggingface.co/YuyaoGe/Prism_Delta ./projections
+```
+
 ### Step 1: Build projection
+
+Skip this step if you downloaded the precomputed projections above.
 
 ```bash
 # PRISM-K (Key-only differential projection)
